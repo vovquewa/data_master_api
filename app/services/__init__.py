@@ -1,1 +1,1 @@
-from .matchproducts import match
+from .matchproducts import match_products

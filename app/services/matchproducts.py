@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 from fuzzywuzzy import fuzz, process
 
+from app.core.logging import logger
 from app.services.read_excel_f import FileFinder, HeaderFinder
 
 
@@ -213,12 +214,9 @@ def match_products(df_order, df_supplier):
     return result
 
 
-def match():
+def match_products(files_dir: str):
 
-    # путь к файлам откуда бурем данные
-    home_dir = os.getcwd()
-    # files_path = str(files_path)
-    dir_rep = FileFinder("/".join([home_dir, "Общее"]))
+    dir_rep = FileFinder(files_dir)
 
     # по части строки ищем по части названия это файл с заказами или кодами,
     # создаем список с названиями столбцов для поиска шапки по названию колонок,
@@ -248,14 +246,20 @@ def match():
 
         # Сопоставление товаров
         matched_products = match_products(df_order, df_supplier)
-
+        result_dir = os.path.join(files_dir, "matched_results.xlsx")
         # Сохранение результатов
-        matched_products.to_excel("matched_results.xlsx", index=False)
-        print(f"Сопоставление завершено. Найдено {len(matched_products)} совпадений.")
-        print("Результаты сохранены в matched_results.xlsx")
+        matched_products.to_excel(result_dir, index=False)
+        if Path(result_dir).exists():
+            logger.info(f"Файл {result_dir} успешно создан.")
+        logger.info(
+            f"Сопоставление завершено. Найдено {len(matched_products)} совпадений."
+        )
+        logger.info(f"Результаты сохранены в {result_dir}")
 
     except Exception as e:
         print(f"Произошла ошибка: {str(e)}")
+
+    return result_dir
 
 
 if __name__ == "__main__":
