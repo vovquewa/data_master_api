@@ -250,14 +250,13 @@ def match_products_post(files_dir: str):
         # Сохранение результатов
         matched_products.to_excel(result_dir, index=False)
         if Path(result_dir).exists():
-            logger.info(f"Файл {result_dir} успешно создан.")
-        logger.info(
-            f"Сопоставление завершено. Найдено {len(matched_products)} совпадений."
-        )
-        logger.info(f"Результаты сохранены в {result_dir}")
+            logger.info(f"File {result_dir} succesfuly created")
+        logger.info(f"Matching complete. Matches: {len(matched_products)}.")
+        logger.info(f"Results saved into {result_dir}")
 
     except Exception as e:
-        print(f"Произошла ошибка: {str(e)}")
+        logger.error(f"{str(type(e).__name__)}: {str(e)}")
+        raise e
 
     return result_dir
 
@@ -288,4 +287,4 @@ if __name__ == "__main__":
         print("Результаты сохранены в matched_results.xlsx")
 
     except Exception as e:
-        print(f"Произошла ошибка: {str(e)}")
+        print(f"Произошла ошибка: {str(e)}, {str(type(e).__name__)}")

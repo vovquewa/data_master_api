@@ -5,16 +5,17 @@ from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
 
-from app.core.constants import DATA_DIR, MAX_FILE_SIZE
 from app.core.logging import logger
 from app.core.security import verify_token
-from app.services import match_products_post, remove_folder
+from app.core.settings import settings
+from app.services import get_file_or_404, match_products_post, remove_folder
 
 router = APIRouter(tags=["processing"], prefix="/processing")
 
 ALLOWED_EXTENSIONS = {".xlsx", ".xls"}
+DATA_DIR = settings.DATA_DIR
+MAX_FILE_SIZE = settings.MAX_FILE_SIZE
 
 
 def validate_file(file: UploadFile) -> None:
@@ -43,7 +44,6 @@ async def match_orders_tmc(
     try:
         with tempfile.TemporaryDirectory(prefix=f"match_{session_id}_") as temp_dir:
             temp_path = Path(temp_dir)
-
             # Validate and save files
             for file in files:
                 validate_file(file)
@@ -68,8 +68,11 @@ async def match_orders_tmc(
             background_tasks.add_task(remove_folder, result_dir)
             logger.info("Processing completed: %s", session_id)
 
-            return FileResponse(final_path, filename="matched_results.xlsx")
+            return get_file_or_404(final_path)
 
+    except ValueError as e:
+        logger.error("Processing failed for session %s: %s", session_id, str(e))
+        raise HTTPException(400, str(e))
     except HTTPException as e:
         logger.error("Processing failed for session %s: %s", session_id, str(e))
         raise e

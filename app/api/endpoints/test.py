@@ -1,19 +1,13 @@
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter
 
-from app.core.constants import API_TOKEN, DATA_DIR
+from app.core.settings import settings
+from app.services import get_file_or_404
 
 router = APIRouter(tags=["test"], prefix="/test")
 
-
-def get_file_or_404(file_path: str) -> FileResponse:
-    """Return file or 404 error."""
-    path = Path(file_path)
-    if not path.exists():
-        raise HTTPException(404, "File not found")
-    return FileResponse(path, filename=path.name)
+DATA_DIR = settings.DATA_DIR
 
 
 @router.get("/excel")

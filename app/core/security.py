@@ -1,9 +1,11 @@
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.core.constants import API_TOKEN
+from app.core.settings import settings
 
 security = HTTPBearer()
+
+API_TOKEN = settings.API_TOKEN
 
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
