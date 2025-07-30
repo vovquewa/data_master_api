@@ -25,6 +25,11 @@ def validate_file(file: UploadFile) -> None:
         raise HTTPException(400, f"Only {ALLOWED_EXTENSIONS} files allowed")
 
 
+def validate_file_size(contents: bytes, filename: str):
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(413, f"File {filename} too large")
+
+
 @router.post("/match-orders-tmc", dependencies=[Depends(verify_token)])
 async def match_orders_tmc(
     background_tasks: BackgroundTasks, files: List[UploadFile] = File(...)
@@ -44,8 +49,7 @@ async def match_orders_tmc(
                 validate_file(file)
 
                 contents = await file.read()
-                if len(contents) > MAX_FILE_SIZE:
-                    raise HTTPException(413, f"File {file.filename} too large")
+                validate_file_size(contents, file.filename)
 
                 file_path = temp_path / file.filename
                 file_path.write_bytes(contents)
@@ -66,6 +70,9 @@ async def match_orders_tmc(
 
             return FileResponse(final_path, filename="matched_results.xlsx")
 
+    except HTTPException as e:
+        logger.error("Processing failed for session %s: %s", session_id, str(e))
+        raise e
     except Exception as e:
         logger.error("Processing failed for session %s: %s", session_id, str(e))
         raise HTTPException(500, "Processing failed")
