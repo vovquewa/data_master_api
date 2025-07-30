@@ -128,6 +128,7 @@ ipython_config.py
 __pypackages__/
 logs/
 app/data/results_*
+.DS_Store
 
 # Celery stuff
 celerybeat-schedule

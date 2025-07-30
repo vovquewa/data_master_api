@@ -31,6 +31,26 @@ def validate_file_size(contents: bytes, filename: str):
         raise HTTPException(413, f"File {filename} too large")
 
 
+async def save_uploaded_files(files: List[UploadFile], temp_path: Path) -> None:
+    for file in files:
+        validate_file(file)
+        contents = await file.read()
+        validate_file_size(contents, file.filename)
+
+        file_path = temp_path / file.filename
+        file_path.write_bytes(contents)
+        logger.info("File saved: %s", file.filename)
+
+
+def prepare_result_directory(session_id: uuid.UUID, result_path: str) -> Path:
+    result_dir = Path(DATA_DIR) / f"results_{session_id}"
+    result_dir.mkdir(exist_ok=True)
+
+    final_path = result_dir / "matched_results.xlsx"
+    Path(result_path).rename(final_path)
+    return final_path
+
+
 @router.post("/match-orders-tmc", dependencies=[Depends(verify_token)])
 async def match_orders_tmc(
     background_tasks: BackgroundTasks, files: List[UploadFile] = File(...)
@@ -44,38 +64,18 @@ async def match_orders_tmc(
     try:
         with tempfile.TemporaryDirectory(prefix=f"match_{session_id}_") as temp_dir:
             temp_path = Path(temp_dir)
-            # Validate and save files
-            for file in files:
-                validate_file(file)
 
-                contents = await file.read()
-                validate_file_size(contents, file.filename)
-
-                file_path = temp_path / file.filename
-                file_path.write_bytes(contents)
-                logger.info("File saved: %s", file.filename)
-
-            # Process files
+            await save_uploaded_files(files, temp_path)
             result_path = await asyncio.to_thread(match_products_post, str(temp_path))
+            final_path = prepare_result_directory(session_id, result_path)
 
-            # Prepare result
-            result_dir = Path(DATA_DIR) / f"results_{session_id}"
-            result_dir.mkdir(exist_ok=True)
-
-            final_path = result_dir / "matched_results.xlsx"
-            Path(result_path).rename(final_path)
-
-            background_tasks.add_task(remove_folder, result_dir)
+            background_tasks.add_task(remove_folder, final_path.parent)
             logger.info("Processing completed: %s", session_id)
 
             return get_file_or_404(final_path)
 
-    except ValueError as e:
-        logger.error("Processing failed for session %s: %s", session_id, str(e))
-        raise HTTPException(400, str(e))
-    except HTTPException as e:
-        logger.error("Processing failed for session %s: %s", session_id, str(e))
-        raise e
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Processing failed for session %s: %s", session_id, str(e))
         raise HTTPException(500, "Processing failed")
