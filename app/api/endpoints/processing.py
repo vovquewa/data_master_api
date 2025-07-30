@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from app.core.constants import DATA_DIR
 from app.core.logging import logger
 from app.core.security import verify_token
-from app.services import match_products_post
+from app.services import match_products_post, remove_folder
 
 router = APIRouter(tags=["processing"], prefix="/processing")
 
@@ -59,5 +59,5 @@ async def match_orders_tmc(
         shutil.copy(Path(result), Path(result_dir_tmp) / "matched_results.xlsx")
         if os.path.exists(Path(result)):
             logger.info("Результат сохранен в %s", result_dir_tmp)
-        background_tasks.add_task(shutil.rmtree, result_dir_tmp)
+        background_tasks.add_task(remove_folder, result_dir_tmp)
         return FileResponse(Path(result_dir_tmp) / "matched_results.xlsx")
