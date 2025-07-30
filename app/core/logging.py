@@ -8,7 +8,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE = os.path.join(LOG_DIR, "app.log")
 
 logger = logging.getLogger("app_logger")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 if not logger.hasHandlers():  # важно, чтобы не дублировать обработчики
     # Обработчик для лог-файла

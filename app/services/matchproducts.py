@@ -214,7 +214,7 @@ def match_products(df_order, df_supplier):
     return result
 
 
-def match_products(files_dir: str):
+def match_products_post(files_dir: str):
 
     dir_rep = FileFinder(files_dir)
 

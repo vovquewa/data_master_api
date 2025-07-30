@@ -1,1 +1,1 @@
-from .matchproducts import match_products
+from .matchproducts import match_products_post

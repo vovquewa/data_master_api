@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from app.core.constants import DATA_DIR
 from app.core.logging import logger
 from app.core.security import verify_token
-from app.services import match_products
+from app.services import match_products_post
 
 router = APIRouter(tags=["processing"], prefix="/processing")
 
@@ -48,8 +48,9 @@ async def match_orders_tmc(
             # Добавляем информацию в список
             file_info.append(file_metadata)
             logger.info("Файл %s загружен", file.filename)
+        logger.debug("Временная директория: %s", temp_dir)
         logger.info("Старт обработки файлов. Сессия: %s", session_id)
-        result = match_products(temp_dir)
+        result = match_products_post(temp_dir)
         logger.info("Завершение обработки файлов. Сессия: %s", session_id)
         result_dir_tmp = Path(os.path.join(DATA_DIR, f"results_{session_id}"))
         logger.info("Создание папки %s", result_dir_tmp)
