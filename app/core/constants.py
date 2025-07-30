@@ -9,3 +9,4 @@ APP_TITLE = "Data Master API"
 APP_DESCRIPTION = "Сервис для обработки фалов эксель"
 WORK_DIR = os.getcwd()
 DATA_DIR = os.path.join(WORK_DIR, "app/data")
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB

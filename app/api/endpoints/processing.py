@@ -1,63 +1,71 @@
-import os
-import shutil
+import asyncio
 import tempfile
 import uuid
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from app.core.constants import DATA_DIR
+from app.core.constants import DATA_DIR, MAX_FILE_SIZE
 from app.core.logging import logger
 from app.core.security import verify_token
 from app.services import match_products_post, remove_folder
 
 router = APIRouter(tags=["processing"], prefix="/processing")
 
+ALLOWED_EXTENSIONS = {".xlsx", ".xls"}
+
+
+def validate_file(file: UploadFile) -> None:
+    if not file.filename:
+        raise HTTPException(400, "Filename is required")
+
+    if Path(file.filename).suffix.lower() not in ALLOWED_EXTENSIONS:
+        raise HTTPException(400, f"Only {ALLOWED_EXTENSIONS} files allowed")
+
 
 @router.post("/match-orders-tmc", dependencies=[Depends(verify_token)])
 async def match_orders_tmc(
     background_tasks: BackgroundTasks, files: List[UploadFile] = File(...)
 ):
+    if not files:
+        raise HTTPException(400, "No files provided")
+
     session_id = uuid.uuid4()
-    logger.info("Старт функции сопоставления файлов. Сессия: %s", session_id)
-    with tempfile.TemporaryDirectory(prefix=f"match_{session_id}_") as temp_dir:
+    logger.info("Processing session started: %s", session_id)
 
-        # Создаем список для хранения информации о файлах
-        file_info = []
+    try:
+        with tempfile.TemporaryDirectory(prefix=f"match_{session_id}_") as temp_dir:
+            temp_path = Path(temp_dir)
 
-        for file in files:
-            # Читаем содержимое файла
-            contents = await file.read()
+            # Validate and save files
+            for file in files:
+                validate_file(file)
 
-            # Получаем метаданные файла
-            file_metadata = {
-                "filename": file.filename,
-                "content_type": file.content_type,
-                "size": len(contents),
-                # Здесь можно добавить дополнительную обработку
-            }
-            # Сохраняем файл в папку temp_dir
-            temp_dir_path = Path(temp_dir)
-            if file_metadata["filename"]:
-                file_path = temp_dir_path / file_metadata["filename"]
-                with open(file_path, "wb") as f:
-                    f.write(contents)
+                contents = await file.read()
+                if len(contents) > MAX_FILE_SIZE:
+                    raise HTTPException(413, f"File {file.filename} too large")
 
-            # Добавляем информацию в список
-            file_info.append(file_metadata)
-            logger.info("Файл %s загружен", file.filename)
-        logger.debug("Временная директория: %s", temp_dir)
-        logger.info("Старт обработки файлов. Сессия: %s", session_id)
-        result = match_products_post(temp_dir)
-        logger.info("Завершение обработки файлов. Сессия: %s", session_id)
-        result_dir_tmp = Path(os.path.join(DATA_DIR, f"results_{session_id}"))
-        logger.info("Создание папки %s", result_dir_tmp)
-        if not os.path.exists(result_dir_tmp):
-            os.mkdir(result_dir_tmp)
-        shutil.copy(Path(result), Path(result_dir_tmp) / "matched_results.xlsx")
-        if os.path.exists(Path(result)):
-            logger.info("Результат сохранен в %s", result_dir_tmp)
-        background_tasks.add_task(remove_folder, result_dir_tmp)
-        return FileResponse(Path(result_dir_tmp) / "matched_results.xlsx")
+                file_path = temp_path / file.filename
+                file_path.write_bytes(contents)
+                logger.info("File saved: %s", file.filename)
+
+            # Process files
+            result_path = await asyncio.to_thread(match_products_post, str(temp_path))
+
+            # Prepare result
+            result_dir = Path(DATA_DIR) / f"results_{session_id}"
+            result_dir.mkdir(exist_ok=True)
+
+            final_path = result_dir / "matched_results.xlsx"
+            Path(result_path).rename(final_path)
+
+            background_tasks.add_task(remove_folder, result_dir)
+            logger.info("Processing completed: %s", session_id)
+
+            return FileResponse(final_path, filename="matched_results.xlsx")
+
+    except Exception as e:
+        logger.error("Processing failed for session %s: %s", session_id, str(e))
+        raise HTTPException(500, "Processing failed")
