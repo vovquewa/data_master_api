@@ -8,5 +8,5 @@ services:
       - ./env/:/app/env/
       - ./logs/:/app/logs/
     ports:
-      - "8001:8000"
+      - "8000:8000"
     restart: always
